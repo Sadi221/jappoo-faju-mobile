@@ -2,8 +2,8 @@
   "expo": {
     "name": "Jappoo Faju",
     "slug": "jappoo-faju",
-    "version": "1.0.0",
-    "orientation": "portrait",
+    "version": "1.0.1",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
@@ -25,9 +25,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1B6B45"
       },
-      "edgeToEdgeEnabled": true,
       "package": "org.jappoo.faju",
-      "versionCode": 3
+      "versionCode": 4
     },
     "web": {
       "favicon": "./assets/favicon.png"
