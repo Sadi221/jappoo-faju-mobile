@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { authAPI } from '../services/api';
 
 export default function AuthScreen({ navigation }) {
@@ -24,7 +24,7 @@ export default function AuthScreen({ navigation }) {
     setLoading(true);
     try {
       const data = await authAPI.login(email, password);
-      await AsyncStorage.setItem('token', data.access_token);
+      await SecureStore.setItemAsync('token', data.access_token);
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Identifiants incorrects');
@@ -42,7 +42,7 @@ export default function AuthScreen({ navigation }) {
     try {
       await authAPI.register({ email, password, full_name: name, phone_number: `+221${phone}`, role: 'DONOR' });
       const data = await authAPI.login(email, password);
-      await AsyncStorage.setItem('token', data.access_token);
+      await SecureStore.setItemAsync('token', data.access_token);
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Erreur lors de l\'inscription');

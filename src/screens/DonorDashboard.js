@@ -4,7 +4,7 @@ import {
   ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { donationsAPI } from '../services/api';
 import { getStoredUser } from '../utils/auth';
 
@@ -47,7 +47,7 @@ export default function DonorDashboard({ navigation }) {
   useEffect(() => { load(); }, [load]);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('token');
+    await SecureStore.deleteItemAsync('token');
     navigation.replace('Auth');
   };
 
