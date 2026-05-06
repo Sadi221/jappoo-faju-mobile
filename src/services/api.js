@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://jappoo-faju-backend-production-b1f1.up.railway.app';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://jappoo-faju-backend-production-b1f1.up.railway.app';
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,

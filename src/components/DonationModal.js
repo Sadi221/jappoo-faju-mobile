@@ -57,6 +57,13 @@ export default function DonationModal({ request, onClose }) {
       }
 
       if (paymentResp.checkout_url) {
+        const ALLOWED_HOSTS = ['checkout.stripe.com', 'app.paydunya.com'];
+        let urlHost;
+        try { urlHost = new URL(paymentResp.checkout_url).hostname; } catch { urlHost = ''; }
+        if (!ALLOWED_HOSTS.some(h => urlHost === h || urlHost.endsWith('.' + h))) {
+          Alert.alert('Erreur', 'URL de paiement non autorisée');
+          return;
+        }
         await Linking.openURL(paymentResp.checkout_url);
         onClose();
       } else {
