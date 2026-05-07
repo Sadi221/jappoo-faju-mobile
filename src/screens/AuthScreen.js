@@ -25,6 +25,7 @@ export default function AuthScreen({ navigation }) {
     try {
       const data = await authAPI.login(email, password);
       await SecureStore.setItemAsync('token', data.access_token);
+      if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Identifiants incorrects');
@@ -43,6 +44,7 @@ export default function AuthScreen({ navigation }) {
       await authAPI.register({ email, password, full_name: name, phone_number: `+221${phone}`, role: 'DONOR' });
       const data = await authAPI.login(email, password);
       await SecureStore.setItemAsync('token', data.access_token);
+      if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Erreur lors de l\'inscription');

@@ -18,6 +18,53 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Intercepteur réponse — rafraîchit automatiquement l'access token sur 401
+let _isRefreshing = false;
+let _queue = [];
+const _processQueue = (error, token = null) => {
+  _queue.forEach(p => error ? p.reject(error) : p.resolve(token));
+  _queue = [];
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status === 401 && !original._retry) {
+      if (_isRefreshing) {
+        return new Promise((resolve, reject) => _queue.push({ resolve, reject }))
+          .then(token => { original.headers.Authorization = `Bearer ${token}`; return api(original); })
+          .catch(err => Promise.reject(err));
+      }
+      original._retry = true;
+      _isRefreshing = true;
+      const refreshToken = await SecureStore.getItemAsync('refresh_token');
+      if (!refreshToken) {
+        _isRefreshing = false;
+        await SecureStore.deleteItemAsync('token').catch(() => {});
+        return Promise.reject(error);
+      }
+      try {
+        const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
+        const { access_token, refresh_token } = resp.data;
+        await SecureStore.setItemAsync('token', access_token);
+        await SecureStore.setItemAsync('refresh_token', refresh_token);
+        _processQueue(null, access_token);
+        original.headers.Authorization = `Bearer ${access_token}`;
+        return api(original);
+      } catch (err) {
+        _processQueue(err, null);
+        await SecureStore.deleteItemAsync('token').catch(() => {});
+        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+        return Promise.reject(err);
+      } finally {
+        _isRefreshing = false;
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ── Auth ──────────────────────────────────────────────────────
 export const authAPI = {
   register: async (data) => (await api.post('/auth/register', data)).data,

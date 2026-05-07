@@ -47,7 +47,15 @@ export default function DonorDashboard({ navigation }) {
   useEffect(() => { load(); }, [load]);
 
   const handleLogout = async () => {
-    await SecureStore.deleteItemAsync('token');
+    try {
+      const refreshToken = await SecureStore.getItemAsync('refresh_token');
+      if (refreshToken) {
+        const { default: api } = await import('../services/api');
+        await api.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {});
+      }
+    } catch {}
+    await SecureStore.deleteItemAsync('token').catch(() => {});
+    await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
     navigation.replace('Auth');
   };
 
