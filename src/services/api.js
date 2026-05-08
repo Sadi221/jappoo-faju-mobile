@@ -69,13 +69,7 @@ api.interceptors.response.use(
 export const authAPI = {
   register: async (data) => (await api.post('/auth/register', data)).data,
   login: async (email, password) => {
-    // FastAPI OAuth2 expects form-encoded data
-    const form = new URLSearchParams();
-    form.append('username', email);
-    form.append('password', password);
-    const res = await api.post('/auth/login', form.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
+    const res = await api.post('/auth/login', { email, password });
     return res.data;
   },
   getCurrentUser: async () => (await api.get('/auth/me')).data,

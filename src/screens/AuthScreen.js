@@ -5,12 +5,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import { authAPI } from '../services/api';
+import api, { authAPI } from '../services/api';
 import {
   isBiometricAvailable,
   isBiometricEnabled,
   setBiometricEnabled,
   authenticateWithBiometrics,
+  hasEnrolledBiometrics,
 } from '../utils/auth';
 
 export default function AuthScreen({ navigation }) {
@@ -52,20 +53,40 @@ export default function AuthScreen({ navigation }) {
   const handleBiometricLogin = async () => {
     const refreshToken = await SecureStore.getItemAsync('refresh_token');
     if (!refreshToken) {
-      Alert.alert('Session expirée', 'Veuillez vous reconnecter avec votre mot de passe.');
+      Alert.alert(
+        'Première connexion requise',
+        'Connectez-vous une fois avec votre mot de passe pour activer la biométrie.',
+        [{ text: 'OK' }]
+      );
       return;
     }
-    const success = await authenticateWithBiometrics();
-    if (!success) return;
+
+    // Vérifier si une biométrie réelle est configurée sur le device
+    const hasBio = await hasEnrolledBiometrics();
+    if (!hasBio) {
+      Alert.alert(
+        'Biométrie non configurée',
+        'Aucune empreinte digitale ni Face ID n\'est enregistré sur cet appareil.\n\nAllez dans Paramètres → Sécurité pour les configurer, puis revenez ici.',
+        [{ text: 'Compris' }]
+      );
+      return;
+    }
+
+    const { success, error } = await authenticateWithBiometrics();
+    if (!success) {
+      if (error && error !== 'user_cancel' && error !== 'system_cancel' && error !== 'app_cancel') {
+        Alert.alert('Face ID indisponible', `Erreur : ${error}\n\nVérifiez que Face ID est bien autorisé pour cette application dans Réglages → Face ID et code.`);
+      }
+      return;
+    }
     setLoading(true);
     try {
-      const { default: api } = await import('../services/api');
       const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
       await SecureStore.setItemAsync('token', resp.data.access_token);
       await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
       navigation.replace('Main');
     } catch {
-      Alert.alert('Erreur', 'Session expirée. Reconnectez-vous avec votre mot de passe.');
+      Alert.alert('Session expirée', 'Reconnectez-vous avec votre mot de passe.');
     } finally {
       setLoading(false);
     }

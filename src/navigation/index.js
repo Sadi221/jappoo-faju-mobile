@@ -38,9 +38,9 @@ function MainTabs() {
         options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏥</Text> }}
       />
       <Tab.Screen
-        name="Mes dons"
+        name="Compte"
         component={DonorDashboard}
-        options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>❤️</Text> }}
+        options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text> }}
       />
     </Tab.Navigator>
   );
@@ -51,34 +51,38 @@ export default function AppNavigator() {
 
   useEffect(() => {
     (async () => {
-      const onboardingDone = await AsyncStorage.getItem('onboarding_done');
-      if (!onboardingDone) {
-        setInitialRoute('Onboarding');
-        return;
-      }
-
-      // Biométrie : si activée et refresh_token présent → challenge
-      const bioEnabled = await isBiometricEnabled();
-      const refreshToken = await SecureStore.getItemAsync('refresh_token');
-      if (bioEnabled && refreshToken) {
-        const success = await authenticateWithBiometrics();
-        if (success) {
-          try {
-            const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
-            await SecureStore.setItemAsync('token', resp.data.access_token);
-            await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
-            setInitialRoute('Main');
-            return;
-          } catch {
-            // Refresh échoué (token révoqué etc.) → login classique
-          }
+      try {
+        const onboardingDone = await AsyncStorage.getItem('onboarding_done');
+        if (!onboardingDone) {
+          setInitialRoute('Onboarding');
+          return;
         }
-        setInitialRoute('Auth');
-        return;
-      }
 
-      const user = await getStoredUser();
-      setInitialRoute(user ? 'Main' : 'Auth');
+        // Biométrie : si activée et refresh_token présent → challenge
+        const bioEnabled = await isBiometricEnabled();
+        const refreshToken = await SecureStore.getItemAsync('refresh_token');
+        if (bioEnabled && refreshToken) {
+          const { success } = await authenticateWithBiometrics();
+          if (success) {
+            try {
+              const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
+              await SecureStore.setItemAsync('token', resp.data.access_token);
+              await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
+              setInitialRoute('Main');
+              return;
+            } catch {
+              // Refresh échoué (token révoqué etc.) → login classique
+            }
+          }
+          setInitialRoute('Auth');
+          return;
+        }
+
+        const user = await getStoredUser();
+        setInitialRoute(user ? 'Main' : 'Auth');
+      } catch {
+        setInitialRoute('Auth');
+      }
     })();
   }, []);
 

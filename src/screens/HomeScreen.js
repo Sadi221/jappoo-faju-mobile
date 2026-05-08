@@ -7,6 +7,7 @@ import {
 const LOGO = require('../../assets/LogoText.png');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { medicalRequestsAPI } from '../services/api';
+import { getStoredUser } from '../utils/auth';
 import { t, MEDICAL_NEED_LABELS, URGENCY_LABELS } from '../utils/translations';
 
 const FILTERS = [
@@ -26,7 +27,7 @@ const URGENCY_BG = {
 
 const STATUS_BG = { ACTIVE: '#16A34A' };
 
-const RequestCard = ({ item, onPress }) => {
+const RequestCard = ({ item, onPress, isDonor }) => {
   const pct = Math.min(Math.round((item.amount_raised / item.amount_needed) * 100), 100);
   const urgencyColor = URGENCY_BG[item.urgency_level] || '#3B82F6';
 
@@ -70,9 +71,11 @@ const RequestCard = ({ item, onPress }) => {
       </View>
 
       {/* CTA */}
-      <TouchableOpacity style={styles.donateBtn} onPress={onPress} activeOpacity={0.85}>
-        <Text style={styles.donateBtnText}>Faire un Don</Text>
-      </TouchableOpacity>
+      {isDonor !== false && (
+        <TouchableOpacity style={styles.donateBtn} onPress={onPress} activeOpacity={0.85}>
+          <Text style={styles.donateBtnText}>Faire un Don</Text>
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 };
@@ -83,6 +86,7 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -97,9 +101,20 @@ export default function HomeScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const loadUser = useCallback(async () => {
+    const user = await getStoredUser();
+    setCurrentUser(user);
+  }, []);
 
-  const applyFilter = (key) => {
+  useEffect(() => { load(); loadUser(); }, [load, loadUser]);
+
+  // Rafraîchir le statut user quand on revient sur cet écran
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', loadUser);
+    return unsubscribe;
+  }, [navigation, loadUser]);
+
+const applyFilter = (key) => {
     setActiveFilter(key);
     setFiltered(key ? requests.filter(r => r.medical_need === key) : requests);
   };
@@ -113,12 +128,20 @@ export default function HomeScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <Image source={LOGO} style={styles.headerLogo} resizeMode="contain" />
-        <TouchableOpacity
-          style={styles.loginBtn}
-          onPress={() => navigation.navigate('Auth')}
-        >
-          <Text style={styles.loginBtnText}>Se connecter</Text>
-        </TouchableOpacity>
+        {currentUser ? (
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleText}>
+              {currentUser.role === 'ADMIN' ? '🛡️ Admin' : currentUser.role === 'HOSPITAL_AGENT' ? '🏥 Agent' : '❤️ Donateur'}
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.loginBtn}
+            onPress={() => navigation.navigate('Auth')}
+          >
+            <Text style={styles.loginBtnText}>Se connecter</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -172,6 +195,7 @@ export default function HomeScreen({ navigation }) {
                 key={item.id}
                 item={item}
                 onPress={() => navigation.navigate('RequestDetail', { request: item })}
+                isDonor={!currentUser || currentUser.role === 'DONOR'}
               />
             ))}
           </View>
@@ -195,6 +219,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1B6B45', borderRadius: 20,
   },
   loginBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  roleBadge: {
+    paddingHorizontal: 10, paddingVertical: 5,
+    backgroundColor: '#2D3A2E', borderRadius: 14,
+  },
+  roleText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   hero: {
     backgroundColor: '#F4F6F9', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4,

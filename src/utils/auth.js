@@ -24,22 +24,55 @@ export const isTokenValid = async () => {
 
 // ── Biométrie ─────────────────────────────────────────────────
 
-export const isBiometricAvailable = async () => {
-  const compatible = await LocalAuthentication.hasHardwareAsync();
-  if (!compatible) return false;
-  return LocalAuthentication.isEnrolledAsync();
+// Retourne le niveau de sécurité réel du device
+export const getSecurityLevel = async () => {
+  try {
+    return await LocalAuthentication.getEnrolledLevelAsync();
+  } catch {
+    return LocalAuthentication.SecurityLevel.NONE;
+  }
 };
 
+// Vrai si le device a au moins un PIN/mot de passe (toggle visible)
+export const isBiometricAvailable = async () => {
+  try {
+    const level = await LocalAuthentication.getEnrolledLevelAsync();
+    return level >= LocalAuthentication.SecurityLevel.SECRET;
+  } catch {
+    return false;
+  }
+};
+
+// Vrai si une biométrie réelle (empreinte ou face) est enrollée
+export const hasEnrolledBiometrics = async () => {
+  try {
+    const level = await LocalAuthentication.getEnrolledLevelAsync();
+    return level >= LocalAuthentication.SecurityLevel.BIOMETRIC_WEAK;
+  } catch {
+    return false;
+  }
+};
+
+// Lance le challenge biométrique — retourne { success, error? }
 export const authenticateWithBiometrics = async () => {
-  const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-  const isFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: isFace ? 'Connexion avec Face ID' : 'Connexion avec empreinte digitale',
-    fallbackLabel: 'Mot de passe',
-    cancelLabel: 'Annuler',
-    disableDeviceFallback: false,
-  });
-  return result.success;
+  try {
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    const isFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+    const hasFingerprint = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+
+    let promptMessage = 'Confirmer votre identité';
+    if (isFace) promptMessage = 'Connexion avec Face ID';
+    else if (hasFingerprint) promptMessage = 'Connexion avec empreinte digitale';
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage,
+      cancelLabel: 'Annuler',
+      disableDeviceFallback: true,
+    });
+    return { success: result.success, error: result.error };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 };
 
 export const setBiometricEnabled = async (enabled) => {

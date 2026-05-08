@@ -17,13 +17,18 @@
       "bundleIdentifier": "org.jappoo.faju",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "Jappoo Faju utilise Face ID pour vous connecter rapidement et en toute sécurité."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1B6B45"
+      },
+      "notification": {
+        "icon": "./assets/adaptive-icon.png",
+        "color": "#1B6B45"
       },
       "package": "org.jappoo.faju",
       "versionCode": 4
@@ -32,7 +37,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-local-authentication"
     ],
     "extra": {
       "eas": {

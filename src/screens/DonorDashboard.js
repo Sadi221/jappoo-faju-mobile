@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { donationsAPI } from '../services/api';
-import { getStoredUser } from '../utils/auth';
+import { getStoredUser, isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, hasEnrolledBiometrics } from '../utils/auth';
 
 const STATUS_COLORS = {
   COMPLETED: '#16A34A',
@@ -23,16 +23,19 @@ const STATUS_LABELS = {
 };
 
 export default function DonorDashboard({ navigation }) {
-  const [user, setUser]           = useState(null);
-  const [donations, setDonations] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [user, setUser]               = useState(null);
+  const [donations, setDonations]     = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [bioEnabled, setBioEnabled]     = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [hasRealBio, setHasRealBio]     = useState(false);
 
   const load = useCallback(async () => {
     try {
       const u = await getStoredUser();
       setUser(u);
-      if (u) {
+      if (u && u.role === 'DONOR') {
         const data = await donationsAPI.getMyDonations();
         setDonations(data);
       }
@@ -44,18 +47,31 @@ export default function DonorDashboard({ navigation }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    (async () => {
+      const [available, enabled, realBio] = await Promise.all([
+        isBiometricAvailable(),
+        isBiometricEnabled(),
+        hasEnrolledBiometrics(),
+      ]);
+      setBioAvailable(available);
+      setBioEnabled(enabled);
+      setHasRealBio(realBio);
+    })();
+  }, [load]);
+
+  const toggleBiometric = async () => {
+    const newVal = !bioEnabled;
+    await setBiometricEnabled(newVal);
+    setBioEnabled(newVal);
+  };
 
   const handleLogout = async () => {
-    try {
-      const refreshToken = await SecureStore.getItemAsync('refresh_token');
-      if (refreshToken) {
-        const { default: api } = await import('../services/api');
-        await api.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {});
-      }
-    } catch {}
+    // Soft logout : on efface uniquement l'access token.
+    // Le refresh_token reste en SecureStore (protégé par Face ID / iOS Keychain)
+    // pour permettre la reconnexion biométrique sans mot de passe.
     await SecureStore.deleteItemAsync('token').catch(() => {});
-    await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
     navigation.replace('Auth');
   };
 
@@ -75,32 +91,72 @@ export default function DonorDashboard({ navigation }) {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Bonjour 👋</Text>
-          <Text style={styles.userName}>{user?.email || 'Donateur'}</Text>
+          <Text style={styles.userName} numberOfLines={1}>{user?.email || 'Utilisateur'}</Text>
+          <View style={styles.rolePill}>
+            <Text style={styles.roleLabel}>
+              {user?.role === 'ADMIN' ? '🛡️ Administrateur' : user?.role === 'HOSPITAL_AGENT' ? '🏥 Agent Hospitalier' : '❤️ Donateur'}
+            </Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Déconnexion</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{donations.length}</Text>
-          <Text style={styles.statLabel}>Dons effectués</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: '#ECFDF5' }]}>
-          <Text style={[styles.statValue, { color: '#16A34A' }]}>
-            {Number(totalDonated).toLocaleString('fr-FR')}
+      {/* Toggle biométrie — visible pour tous les rôles */}
+      {bioAvailable && (
+        <TouchableOpacity style={styles.bioRow} onPress={toggleBiometric} activeOpacity={0.7}>
+          <View style={styles.bioRowLeft}>
+            <Text style={styles.bioRowIcon}>🔒</Text>
+            <View>
+              <Text style={styles.bioRowTitle}>Connexion biométrique</Text>
+              <Text style={styles.bioRowSub}>
+                {hasRealBio ? 'Face ID / Empreinte digitale' : 'Code appareil (configurez Face ID/Empreinte dans Paramètres)'}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.bioToggle, bioEnabled && styles.bioToggleOn]}>
+            <View style={[styles.bioThumb, bioEnabled && styles.bioThumbOn]} />
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {user?.role !== 'DONOR' ? (
+        <View style={styles.nonDonorBanner}>
+          <Text style={styles.nonDonorIcon}>
+            {user?.role === 'ADMIN' ? '🛡️' : '🏥'}
           </Text>
-          <Text style={styles.statLabel}>FCFA donnés</Text>
+          <Text style={styles.nonDonorTitle}>
+            {user?.role === 'ADMIN' ? 'Compte Administrateur' : 'Compte Agent Hospitalier'}
+          </Text>
+          <Text style={styles.nonDonorSub}>
+            La gestion complète est disponible sur le tableau de bord web.
+          </Text>
         </View>
-      </View>
+      ) : (
+        <>
+          {/* Stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{donations.length}</Text>
+              <Text style={styles.statLabel}>Dons effectués</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#ECFDF5' }]}>
+              <Text style={[styles.statValue, { color: '#16A34A' }]}>
+                {Number(totalDonated).toLocaleString('fr-FR')}
+              </Text>
+              <Text style={styles.statLabel}>FCFA donnés</Text>
+            </View>
+          </View>
 
-      {/* Historique */}
-      <Text style={styles.sectionTitle}>Historique des dons</Text>
+          {/* Historique */}
+          <Text style={styles.sectionTitle}>Historique des dons</Text>
+        </>
+      )}
 
+      {user?.role === 'DONOR' && (
       <ScrollView
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#2563EB" />}
@@ -140,6 +196,7 @@ export default function DonorDashboard({ navigation }) {
           ))
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -153,10 +210,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 16,
     backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E8F0FE',
   },
+  headerLeft: { flex: 1, marginRight: 12 },
   greeting: { fontSize: 12, color: '#94A3B8' },
   userName: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
+  rolePill: { marginTop: 4 },
+  roleLabel: { fontSize: 11, color: '#2563EB', fontWeight: '700' },
   logoutBtn: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#FEF2F2', borderRadius: 10 },
   logoutText: { color: '#EF4444', fontWeight: '700', fontSize: 13 },
+  bioRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginHorizontal: 20, marginTop: 16, padding: 16,
+    backgroundColor: '#fff', borderRadius: 16,
+    borderWidth: 1, borderColor: '#E2E8F0',
+  },
+  bioRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  bioRowIcon: { fontSize: 22 },
+  bioRowTitle: { fontSize: 14, fontWeight: '700', color: '#1E293B' },
+  bioRowSub: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  bioToggle: {
+    width: 46, height: 26, borderRadius: 13,
+    backgroundColor: '#CBD5E1', padding: 3, justifyContent: 'center',
+  },
+  bioToggleOn: { backgroundColor: '#2563EB' },
+  bioThumb: {
+    width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff',
+    alignSelf: 'flex-start',
+  },
+  bioThumbOn: { alignSelf: 'flex-end' },
+  nonDonorBanner: {
+    margin: 24, padding: 28, backgroundColor: '#EFF6FF',
+    borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE',
+  },
+  nonDonorIcon: { fontSize: 48, marginBottom: 12 },
+  nonDonorTitle: { fontSize: 18, fontWeight: '900', color: '#1E40AF', marginBottom: 8 },
+  nonDonorSub: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 20 },
 
   statsRow: { flexDirection: 'row', gap: 12, padding: 16 },
   statCard: {
