@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
@@ -6,6 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { authAPI } from '../services/api';
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  setBiometricEnabled,
+  authenticateWithBiometrics,
+} from '../utils/auth';
 
 export default function AuthScreen({ navigation }) {
   const [mode, setMode]         = useState('login'); // 'login' | 'register'
@@ -15,6 +21,55 @@ export default function AuthScreen({ navigation }) {
   const [phone, setPhone]       = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading]   = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const enabled = await isBiometricEnabled();
+      setBiometricEnabledState(enabled);
+    })();
+  }, []);
+
+  const offerBiometricSetup = async () => {
+    const available = await isBiometricAvailable();
+    const alreadyEnabled = await isBiometricEnabled();
+    if (!available || alreadyEnabled) return;
+    Alert.alert(
+      'Connexion biométrique',
+      'Activer Face ID / empreinte digitale pour vous connecter plus rapidement ?',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Activer', onPress: async () => {
+            await setBiometricEnabled(true);
+            setBiometricEnabledState(true);
+          }
+        },
+      ]
+    );
+  };
+
+  const handleBiometricLogin = async () => {
+    const refreshToken = await SecureStore.getItemAsync('refresh_token');
+    if (!refreshToken) {
+      Alert.alert('Session expirée', 'Veuillez vous reconnecter avec votre mot de passe.');
+      return;
+    }
+    const success = await authenticateWithBiometrics();
+    if (!success) return;
+    setLoading(true);
+    try {
+      const { default: api } = await import('../services/api');
+      const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
+      await SecureStore.setItemAsync('token', resp.data.access_token);
+      await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
+      navigation.replace('Main');
+    } catch {
+      Alert.alert('Erreur', 'Session expirée. Reconnectez-vous avec votre mot de passe.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -26,6 +81,7 @@ export default function AuthScreen({ navigation }) {
       const data = await authAPI.login(email, password);
       await SecureStore.setItemAsync('token', data.access_token);
       if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
+      await offerBiometricSetup();
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Identifiants incorrects');
@@ -45,6 +101,7 @@ export default function AuthScreen({ navigation }) {
       const data = await authAPI.login(email, password);
       await SecureStore.setItemAsync('token', data.access_token);
       if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
+      await offerBiometricSetup();
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Erreur lors de l\'inscription');
@@ -161,6 +218,17 @@ export default function AuthScreen({ navigation }) {
               )}
             </TouchableOpacity>
 
+            {mode === 'login' && biometricEnabled && (
+              <TouchableOpacity
+                style={styles.bioBtn}
+                onPress={handleBiometricLogin}
+                disabled={loading}
+              >
+                <Text style={styles.bioIcon}>🔒</Text>
+                <Text style={styles.bioText}>Face ID / Empreinte digitale</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.skipBtn}
               onPress={() => navigation.replace('Main')}
@@ -208,6 +276,15 @@ const styles = StyleSheet.create({
 
   skipBtn: { alignItems: 'center', marginTop: 20, padding: 8 },
   skipText: { color: '#94A3B8', fontSize: 13 },
+
+  bioBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, marginTop: 16, paddingVertical: 14,
+    backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#86EFAC',
+    borderRadius: 14,
+  },
+  bioIcon: { fontSize: 20 },
+  bioText: { fontSize: 15, fontWeight: '700', color: '#16A34A' },
 
   phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   phonePrefix: {

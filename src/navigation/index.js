@@ -5,7 +5,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { getStoredUser } from '../utils/auth';
+import * as SecureStore from 'expo-secure-store';
+import {
+  getStoredUser,
+  isBiometricEnabled,
+  authenticateWithBiometrics,
+} from '../utils/auth';
+import api from '../services/api';
 import OnboardingScreen    from '../screens/OnboardingScreen';
 import HomeScreen          from '../screens/HomeScreen';
 import RequestDetailScreen from '../screens/RequestDetailScreen';
@@ -50,6 +56,27 @@ export default function AppNavigator() {
         setInitialRoute('Onboarding');
         return;
       }
+
+      // Biométrie : si activée et refresh_token présent → challenge
+      const bioEnabled = await isBiometricEnabled();
+      const refreshToken = await SecureStore.getItemAsync('refresh_token');
+      if (bioEnabled && refreshToken) {
+        const success = await authenticateWithBiometrics();
+        if (success) {
+          try {
+            const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
+            await SecureStore.setItemAsync('token', resp.data.access_token);
+            await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
+            setInitialRoute('Main');
+            return;
+          } catch {
+            // Refresh échoué (token révoqué etc.) → login classique
+          }
+        }
+        setInitialRoute('Auth');
+        return;
+      }
+
       const user = await getStoredUser();
       setInitialRoute(user ? 'Main' : 'Auth');
     })();
