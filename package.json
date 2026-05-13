@@ -17,7 +17,7 @@
     "axios": "^1.14.0",
     "expo": "^49.0.23",
     "expo-local-authentication": "~15.0.1",
-    "expo-notifications": "~0.20.1",
+    "expo-notifications": "^0.29.14",
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "framer-motion": "^12.38.0",
