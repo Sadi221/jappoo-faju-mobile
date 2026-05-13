@@ -38,15 +38,7 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-local-authentication",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/adaptive-icon.png",
-          "color": "#1B6B45",
-          "sounds": []
-        }
-      ]
+      "expo-local-authentication"
     ],
     "extra": {
       "eas": {
