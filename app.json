@@ -31,8 +31,7 @@
         "color": "#1B6B45"
       },
       "package": "org.jappoo.faju",
-      "versionCode": 4,
-      "googleServicesFile": "./google-services.json"
+      "versionCode": 4
     },
     "web": {
       "favicon": "./assets/favicon.png"

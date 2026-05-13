@@ -40,3 +40,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase — client config (non versionnée, fournie via EAS credentials)
+google-services.json
