@@ -73,6 +73,7 @@ export const authAPI = {
     return res.data;
   },
   getCurrentUser: async () => (await api.get('/auth/me')).data,
+  savePushToken: async (push_token) => (await api.post('/auth/push-token', { push_token })).data,
 };
 
 // ── Demandes médicales ────────────────────────────────────────

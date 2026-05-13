@@ -13,6 +13,7 @@ import {
   authenticateWithBiometrics,
   hasEnrolledBiometrics,
 } from '../utils/auth';
+import { registerPushToken } from '../utils/notifications';
 
 export default function AuthScreen({ navigation }) {
   const [mode, setMode]         = useState('login'); // 'login' | 'register'
@@ -84,6 +85,7 @@ export default function AuthScreen({ navigation }) {
       const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
       await SecureStore.setItemAsync('token', resp.data.access_token);
       await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
+      registerPushToken().catch(() => {});
       navigation.replace('Main');
     } catch {
       Alert.alert('Session expirée', 'Reconnectez-vous avec votre mot de passe.');
@@ -102,6 +104,7 @@ export default function AuthScreen({ navigation }) {
       const data = await authAPI.login(email, password);
       await SecureStore.setItemAsync('token', data.access_token);
       if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
+      registerPushToken().catch(() => {});
       await offerBiometricSetup();
       navigation.replace('Main');
     } catch (err) {
@@ -122,6 +125,7 @@ export default function AuthScreen({ navigation }) {
       const data = await authAPI.login(email, password);
       await SecureStore.setItemAsync('token', data.access_token);
       if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
+      registerPushToken().catch(() => {});
       await offerBiometricSetup();
       navigation.replace('Main');
     } catch (err) {

@@ -11,6 +11,7 @@ import {
   isBiometricEnabled,
   authenticateWithBiometrics,
 } from '../utils/auth';
+import { registerPushToken } from '../utils/notifications';
 import api from '../services/api';
 import OnboardingScreen    from '../screens/OnboardingScreen';
 import HomeScreen          from '../screens/HomeScreen';
@@ -68,6 +69,7 @@ export default function AppNavigator() {
               const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
               await SecureStore.setItemAsync('token', resp.data.access_token);
               await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
+              registerPushToken().catch(() => {});
               setInitialRoute('Main');
               return;
             } catch {
@@ -79,6 +81,7 @@ export default function AppNavigator() {
         }
 
         const user = await getStoredUser();
+        if (user) registerPushToken().catch(() => {});
         setInitialRoute(user ? 'Main' : 'Auth');
       } catch {
         setInitialRoute('Auth');
