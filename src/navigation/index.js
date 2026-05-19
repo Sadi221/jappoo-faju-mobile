@@ -18,12 +18,16 @@ import HomeScreen                from '../screens/HomeScreen';
 import RequestDetailScreen       from '../screens/RequestDetailScreen';
 import AuthScreen                from '../screens/AuthScreen';
 import DonorDashboard            from '../screens/DonorDashboard';
+import AgentDashboard            from '../screens/agent/AgentDashboard';
 import NewMedicalRequestScreen   from '../screens/agent/NewMedicalRequestScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
-function MainTabs() {
+// MainTabs reçoit userRole depuis AppNavigator via render prop
+function MainTabs({ userRole }) {
+  const isAgent = userRole === 'HOSPITAL_AGENT';
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -41,7 +45,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Compte"
-        component={DonorDashboard}
+        component={isAgent ? AgentDashboard : DonorDashboard}
         options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text> }}
       />
     </Tab.Navigator>
@@ -50,6 +54,7 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const [initialRoute, setInitialRoute] = useState(null);
+  const [userRole, setUserRole]         = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -61,7 +66,7 @@ export default function AppNavigator() {
         }
 
         // Biométrie : si activée et refresh_token présent → challenge
-        const bioEnabled = await isBiometricEnabled();
+        const bioEnabled   = await isBiometricEnabled();
         const refreshToken = await SecureStore.getItemAsync('refresh_token');
         if (bioEnabled && refreshToken) {
           const { success } = await authenticateWithBiometrics();
@@ -70,11 +75,15 @@ export default function AppNavigator() {
               const resp = await api.post('/auth/refresh', { refresh_token: refreshToken });
               await SecureStore.setItemAsync('token', resp.data.access_token);
               await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
-              registerPushToken().catch(() => {});
+              const user = await getStoredUser();
+              if (user) {
+                setUserRole(user.role);
+                registerPushToken().catch(() => {});
+              }
               setInitialRoute('Main');
               return;
             } catch {
-              // Refresh échoué (token révoqué etc.) → login classique
+              // Refresh échoué → login classique
             }
           }
           setInitialRoute('Auth');
@@ -82,7 +91,10 @@ export default function AppNavigator() {
         }
 
         const user = await getStoredUser();
-        if (user) registerPushToken().catch(() => {});
+        if (user) {
+          setUserRole(user.role);
+          registerPushToken().catch(() => {});
+        }
         setInitialRoute(user ? 'Main' : 'Auth');
       } catch {
         setInitialRoute('Auth');
@@ -102,9 +114,14 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Onboarding"    component={OnboardingScreen} />
-        <Stack.Screen name="Auth"          component={AuthScreen} />
-        <Stack.Screen name="Main"          component={MainTabs} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <Stack.Screen name="Auth"       component={AuthScreen} />
+
+        {/* MainTabs reçoit userRole via render prop pour router vers le bon dashboard */}
+        <Stack.Screen name="Main">
+          {(props) => <MainTabs {...props} userRole={userRole} />}
+        </Stack.Screen>
+
         <Stack.Screen
           name="RequestDetail"
           component={RequestDetailScreen}
