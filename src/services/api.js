@@ -81,8 +81,11 @@ export const medicalRequestsAPI = {
   getAll: async (params = {}) => (await api.get('/medical-requests/', { params })).data,
   getById: async (id) => (await api.get(`/medical-requests/${id}`)).data,
   create: async (data) => (await api.post('/medical-requests/', data)).data,
+  createMedicalRequest: async (data) => (await api.post('/medical-requests/', data)).data,
+  getPending: async () => (await api.get('/medical-requests/pending')).data,
   validate: async (id) => (await api.patch(`/medical-requests/${id}/validate`)).data,
   reject: async (id) => (await api.patch(`/medical-requests/${id}/reject`)).data,
+  publish: async (id) => (await api.patch(`/medical-requests/${id}/publish`)).data,
 };
 
 // ── Paiements ─────────────────────────────────────────────────

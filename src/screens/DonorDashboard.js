@@ -123,14 +123,26 @@ export default function DonorDashboard({ navigation }) {
         </TouchableOpacity>
       )}
 
-      {user?.role !== 'DONOR' ? (
+      {user?.role === 'HOSPITAL_AGENT' ? (
+        <View style={styles.agentSection}>
+          <Text style={styles.agentSectionTitle}>🏥 Tableau de bord agent</Text>
+          <TouchableOpacity
+            style={styles.newRequestBtn}
+            onPress={() => navigation.navigate('NewMedicalRequest')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.newRequestBtnIcon}>＋</Text>
+            <Text style={styles.newRequestBtnText}>Nouvelle demande de financement</Text>
+          </TouchableOpacity>
+          <Text style={styles.agentHint}>
+            Les demandes soumises seront examinées par le Chef de Service Social et le Référent
+            Médical avant publication.
+          </Text>
+        </View>
+      ) : user?.role !== 'DONOR' ? (
         <View style={styles.nonDonorBanner}>
-          <Text style={styles.nonDonorIcon}>
-            {user?.role === 'ADMIN' ? '🛡️' : '🏥'}
-          </Text>
-          <Text style={styles.nonDonorTitle}>
-            {user?.role === 'ADMIN' ? 'Compte Administrateur' : 'Compte Agent Hospitalier'}
-          </Text>
+          <Text style={styles.nonDonorIcon}>🛡️</Text>
+          <Text style={styles.nonDonorTitle}>Compte Administrateur</Text>
           <Text style={styles.nonDonorSub}>
             La gestion complète est disponible sur le tableau de bord web.
           </Text>
@@ -237,6 +249,27 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   bioThumbOn: { alignSelf: 'flex-end' },
+  agentSection: {
+    margin: 16, padding: 20, backgroundColor: '#ECFDF5',
+    borderRadius: 20, borderWidth: 1, borderColor: '#BBF7D0',
+  },
+  agentSectionTitle: {
+    fontSize: 16, fontWeight: '900', color: '#15803D', marginBottom: 14,
+  },
+  newRequestBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1B6B45', borderRadius: 14,
+    paddingVertical: 15, paddingHorizontal: 20, gap: 8,
+    shadowColor: '#1B6B45', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  },
+  newRequestBtnIcon: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  newRequestBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  agentHint: {
+    fontSize: 12, color: '#16A34A', textAlign: 'center',
+    marginTop: 12, lineHeight: 18,
+  },
+
   nonDonorBanner: {
     margin: 24, padding: 28, backgroundColor: '#EFF6FF',
     borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE',

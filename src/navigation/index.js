@@ -13,11 +13,12 @@ import {
 } from '../utils/auth';
 import { registerPushToken } from '../utils/notifications';
 import api from '../services/api';
-import OnboardingScreen    from '../screens/OnboardingScreen';
-import HomeScreen          from '../screens/HomeScreen';
-import RequestDetailScreen from '../screens/RequestDetailScreen';
-import AuthScreen          from '../screens/AuthScreen';
-import DonorDashboard      from '../screens/DonorDashboard';
+import OnboardingScreen          from '../screens/OnboardingScreen';
+import HomeScreen                from '../screens/HomeScreen';
+import RequestDetailScreen       from '../screens/RequestDetailScreen';
+import AuthScreen                from '../screens/AuthScreen';
+import DonorDashboard            from '../screens/DonorDashboard';
+import NewMedicalRequestScreen   from '../screens/agent/NewMedicalRequestScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
@@ -114,6 +115,11 @@ export default function AppNavigator() {
             headerTintColor: '#1B6B45',
             headerStyle: { backgroundColor: '#fff' },
           }}
+        />
+        <Stack.Screen
+          name="NewMedicalRequest"
+          component={NewMedicalRequestScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
