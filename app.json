@@ -30,8 +30,7 @@
         "icon": "./assets/adaptive-icon.png",
         "color": "#1B6B45"
       },
-      "package": "org.jappoo.faju",
-      "versionCode": 4
+      "package": "org.jappoo.faju"
     },
     "web": {
       "favicon": "./assets/favicon.png"
