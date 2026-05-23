@@ -43,3 +43,11 @@ yarn-error.*
 
 # Firebase — client config (non versionnée, fournie via EAS credentials)
 google-services.json
+
+# Firebase Admin SDK service account key (NE JAMAIS COMMITER)
+*-adminsdk-*.json
+jappoo-faju-firebase-adminsdk-fbsvc-e4982f6364.json
+
+# EAS build outputs
+*.aab
+*.apk
