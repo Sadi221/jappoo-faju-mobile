@@ -20,13 +20,27 @@ import AuthScreen                from '../screens/AuthScreen';
 import DonorDashboard            from '../screens/DonorDashboard';
 import AgentDashboard            from '../screens/agent/AgentDashboard';
 import NewMedicalRequestScreen   from '../screens/agent/NewMedicalRequestScreen';
+import ValidatorDashboard        from '../screens/validator/ValidatorDashboard';
+import AdminDashboard            from '../screens/admin/AdminDashboard';
+
+// Wrappers stables (hors render) pour éviter les re-montages React Navigation
+const CssDashboardScreen = (props) => <ValidatorDashboard {...props} role="CHEF_SERVICE_SOCIAL" />;
+const RmDashboardScreen  = (props) => <ValidatorDashboard {...props} role="REFERENT_MEDICAL" />;
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
 // MainTabs reçoit userRole depuis AppNavigator via render prop
 function MainTabs({ userRole }) {
-  const isAgent = userRole === 'HOSPITAL_AGENT';
+  const dashboardComponent = {
+    HOSPITAL_AGENT:      AgentDashboard,
+    CHEF_SERVICE_SOCIAL: CssDashboardScreen,
+    REFERENT_MEDICAL:    RmDashboardScreen,
+    ADMIN:               AdminDashboard,
+  }[userRole] ?? DonorDashboard;
+
+  // Cacher l'onglet Accueil pour les rôles internes (validateurs + admin)
+  const isInternalRole = ['CHEF_SERVICE_SOCIAL', 'REFERENT_MEDICAL', 'ADMIN'].includes(userRole);
 
   return (
     <Tab.Navigator
@@ -38,14 +52,16 @@ function MainTabs({ userRole }) {
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
       }}
     >
-      <Tab.Screen
-        name="Accueil"
-        component={HomeScreen}
-        options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏥</Text> }}
-      />
+      {!isInternalRole && (
+        <Tab.Screen
+          name="Accueil"
+          component={HomeScreen}
+          options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏥</Text> }}
+        />
+      )}
       <Tab.Screen
         name="Compte"
-        component={isAgent ? AgentDashboard : DonorDashboard}
+        component={dashboardComponent}
         options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text> }}
       />
     </Tab.Navigator>
