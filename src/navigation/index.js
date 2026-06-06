@@ -44,6 +44,7 @@ function MainTabs({ userRole }) {
 
   return (
     <Tab.Navigator
+      key={userRole ?? 'anon'}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#1B6B45',
