@@ -131,7 +131,9 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Auth"       component={AuthScreen} />
+        <Stack.Screen name="Auth">
+          {(props) => <AuthScreen {...props} onLogin={(role) => setUserRole(role)} />}
+        </Stack.Screen>
 
         {/* MainTabs reçoit userRole via render prop pour router vers le bon dashboard */}
         <Stack.Screen name="Main">

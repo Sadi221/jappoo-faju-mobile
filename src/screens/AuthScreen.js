@@ -12,10 +12,11 @@ import {
   setBiometricEnabled,
   authenticateWithBiometrics,
   hasEnrolledBiometrics,
+  getStoredUser,
 } from '../utils/auth';
 import { registerPushToken } from '../utils/notifications';
 
-export default function AuthScreen({ navigation }) {
+export default function AuthScreen({ navigation, onLogin }) {
   const [mode, setMode]         = useState('login'); // 'login' | 'register'
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -86,6 +87,8 @@ export default function AuthScreen({ navigation }) {
       await SecureStore.setItemAsync('token', resp.data.access_token);
       await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
       registerPushToken().catch(() => {});
+      const bioUser = await getStoredUser();
+      if (onLogin) onLogin(bioUser?.role ?? null);
       navigation.replace('Main');
     } catch {
       Alert.alert('Session expirée', 'Reconnectez-vous avec votre mot de passe.');
@@ -106,6 +109,8 @@ export default function AuthScreen({ navigation }) {
       if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
       registerPushToken().catch(() => {});
       await offerBiometricSetup();
+      const loginUser = await getStoredUser();
+      if (onLogin) onLogin(loginUser?.role ?? null);
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Identifiants incorrects');
@@ -127,6 +132,8 @@ export default function AuthScreen({ navigation }) {
       if (data.refresh_token) await SecureStore.setItemAsync('refresh_token', data.refresh_token);
       registerPushToken().catch(() => {});
       await offerBiometricSetup();
+      const regUser = await getStoredUser();
+      if (onLogin) onLogin(regUser?.role ?? null);
       navigation.replace('Main');
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Erreur lors de l\'inscription');
