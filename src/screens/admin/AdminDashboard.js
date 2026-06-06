@@ -34,6 +34,14 @@ export default function AdminDashboard({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [acting, setActing]         = useState(null);
 
+  // Gère réponses tableau direct, { items: [] } ou { data: [] }
+  const toList = (raw) => {
+    if (Array.isArray(raw))        return raw;
+    if (Array.isArray(raw?.items)) return raw.items;
+    if (Array.isArray(raw?.data))  return raw.data;
+    return [];
+  };
+
   const load = useCallback(async () => {
     try {
       const stored = await getStoredUser();
@@ -42,22 +50,25 @@ export default function AdminDashboard({ navigation }) {
         .then((me) => setUser((prev) => ({ ...prev, full_name: me.full_name })))
         .catch(() => {});
 
-      const [v, p, a, c, agRes, hRes] = await Promise.all([
+      const [v, p, a, c] = await Promise.all([
         medicalRequestsAPI.getAll({ status: 'VALIDATED',          limit: 50 }),
         medicalRequestsAPI.getAll({ status: 'PENDING_VALIDATION', limit: 50 }),
         medicalRequestsAPI.getAll({ status: 'ACTIVE',             limit: 50 }),
         medicalRequestsAPI.getAll({ status: 'COMPLETED',          limit: 50 }),
-        api.get('/admin/users', { params: { role: 'HOSPITAL_AGENT', limit: 100 } })
-           .then(r => r.data).catch(() => []),
-        hospitalsAPI.getAll().catch(() => []),
       ]);
+      setValidated(toList(v));
+      setPending(toList(p));
+      setActive(toList(a));
+      setCompleted(toList(c));
 
-      setValidated(Array.isArray(v) ? v : []);
-      setPending(Array.isArray(p) ? p : []);
-      setActive(Array.isArray(a) ? a : []);
-      setCompleted(Array.isArray(c) ? c : []);
-      setAgents(Array.isArray(agRes) ? agRes : []);
-      setHospitals(Array.isArray(hRes) ? hRes : []);
+      // Hôpitaux et agents en parallèle, indépendants — erreurs loguées
+      hospitalsAPI.getAll()
+        .then((h) => setHospitals(toList(h)))
+        .catch((e) => console.warn('Hospitals error', e?.response?.status, e?.message));
+
+      api.get('/admin/users', { params: { role: 'HOSPITAL_AGENT', limit: 100 } })
+        .then((r) => setAgents(toList(r.data)))
+        .catch((e) => console.warn('Agents error', e?.response?.status, e?.message));
     } catch (e) {
       console.error('AdminDashboard load error:', e);
     } finally {
