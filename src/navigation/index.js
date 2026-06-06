@@ -135,9 +135,9 @@ export default function AppNavigator() {
           {(props) => <AuthScreen {...props} onLogin={(role) => setUserRole(role)} />}
         </Stack.Screen>
 
-        {/* MainTabs reçoit userRole via render prop pour router vers le bon dashboard */}
+        {/* userRole : route.params en priorité (login), state en fallback (démarrage) */}
         <Stack.Screen name="Main">
-          {(props) => <MainTabs {...props} userRole={userRole} />}
+          {(props) => <MainTabs {...props} userRole={props.route.params?.userRole ?? userRole} />}
         </Stack.Screen>
 
         <Stack.Screen

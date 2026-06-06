@@ -88,8 +88,9 @@ export default function AuthScreen({ navigation, onLogin }) {
       await SecureStore.setItemAsync('refresh_token', resp.data.refresh_token);
       registerPushToken().catch(() => {});
       const bioUser = await getStoredUser();
-      if (onLogin) onLogin(bioUser?.role ?? null);
-      navigation.replace('Main');
+      const bioRole = bioUser?.role ?? null;
+      if (onLogin) onLogin(bioRole);
+      navigation.replace('Main', { userRole: bioRole });
     } catch {
       Alert.alert('Session expirée', 'Reconnectez-vous avec votre mot de passe.');
     } finally {
@@ -110,8 +111,9 @@ export default function AuthScreen({ navigation, onLogin }) {
       registerPushToken().catch(() => {});
       await offerBiometricSetup();
       const loginUser = await getStoredUser();
-      if (onLogin) onLogin(loginUser?.role ?? null);
-      navigation.replace('Main');
+      const loginRole = loginUser?.role ?? null;
+      if (onLogin) onLogin(loginRole);
+      navigation.replace('Main', { userRole: loginRole });
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Identifiants incorrects');
     } finally {
@@ -133,8 +135,9 @@ export default function AuthScreen({ navigation, onLogin }) {
       registerPushToken().catch(() => {});
       await offerBiometricSetup();
       const regUser = await getStoredUser();
-      if (onLogin) onLogin(regUser?.role ?? null);
-      navigation.replace('Main');
+      const regRole = regUser?.role ?? null;
+      if (onLogin) onLogin(regRole);
+      navigation.replace('Main', { userRole: regRole });
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.detail || 'Erreur lors de l\'inscription');
     } finally {
