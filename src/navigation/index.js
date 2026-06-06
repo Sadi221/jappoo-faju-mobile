@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext, useContext } from 'react';
 import { ActivityIndicator, View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -23,6 +23,9 @@ import NewMedicalRequestScreen   from '../screens/agent/NewMedicalRequestScreen'
 import ValidatorDashboard        from '../screens/validator/ValidatorDashboard';
 import AdminDashboard            from '../screens/admin/AdminDashboard';
 
+// Contexte partagé : userRole disponible dans tout l'arbre sans render prop
+export const UserRoleContext = createContext(null);
+
 // Wrappers stables (hors render) pour éviter les re-montages React Navigation
 const CssDashboardScreen = (props) => <ValidatorDashboard {...props} role="CHEF_SERVICE_SOCIAL" />;
 const RmDashboardScreen  = (props) => <ValidatorDashboard {...props} role="REFERENT_MEDICAL" />;
@@ -30,8 +33,10 @@ const RmDashboardScreen  = (props) => <ValidatorDashboard {...props} role="REFER
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
-// MainTabs reçoit userRole depuis AppNavigator via render prop
-function MainTabs({ userRole }) {
+// MainTabs est un composant stable (pas de render prop) — lit le rôle via contexte
+function MainTabs() {
+  const userRole = useContext(UserRoleContext);
+
   const dashboardComponent = {
     HOSPITAL_AGENT:      AgentDashboard,
     CHEF_SERVICE_SOCIAL: CssDashboardScreen,
@@ -39,17 +44,16 @@ function MainTabs({ userRole }) {
     ADMIN:               AdminDashboard,
   }[userRole] ?? DonorDashboard;
 
-  // Cacher l'onglet Accueil pour les rôles internes (validateurs + admin)
   const isInternalRole = ['CHEF_SERVICE_SOCIAL', 'REFERENT_MEDICAL', 'ADMIN'].includes(userRole);
 
   return (
     <Tab.Navigator
-      key={userRole ?? 'anon'}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#1B6B45',
         tabBarInactiveTintColor: '#94A3B8',
-        tabBarStyle: { borderTopColor: '#E8F0FE' },
+        // Masquer la barre pour les rôles mono-onglet (elle serait inactive et inutile)
+        tabBarStyle: isInternalRole ? { display: 'none' } : { borderTopColor: '#E8F0FE' },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
       }}
     >
@@ -129,35 +133,35 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Auth">
-          {(props) => <AuthScreen {...props} onLogin={(role) => setUserRole(role)} />}
-        </Stack.Screen>
+    <UserRoleContext.Provider value={userRole}>
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="Auth">
+            {(props) => <AuthScreen {...props} onLogin={(role) => setUserRole(role)} />}
+          </Stack.Screen>
 
-        {/* userRole : route.params en priorité (login), state en fallback (démarrage) */}
-        <Stack.Screen name="Main">
-          {(props) => <MainTabs {...props} userRole={props.route.params?.userRole ?? userRole} />}
-        </Stack.Screen>
+          {/* Composant stable — pas de render prop, rôle lu depuis UserRoleContext */}
+          <Stack.Screen name="Main" component={MainTabs} />
 
-        <Stack.Screen
-          name="RequestDetail"
-          component={RequestDetailScreen}
-          options={{
-            headerShown: true,
-            headerTitle: 'Détail du cas',
-            headerBackTitle: 'Retour',
-            headerTintColor: '#1B6B45',
-            headerStyle: { backgroundColor: '#fff' },
-          }}
-        />
-        <Stack.Screen
-          name="NewMedicalRequest"
-          component={NewMedicalRequestScreen}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+          <Stack.Screen
+            name="RequestDetail"
+            component={RequestDetailScreen}
+            options={{
+              headerShown: true,
+              headerTitle: 'Détail du cas',
+              headerBackTitle: 'Retour',
+              headerTintColor: '#1B6B45',
+              headerStyle: { backgroundColor: '#fff' },
+            }}
+          />
+          <Stack.Screen
+            name="NewMedicalRequest"
+            component={NewMedicalRequestScreen}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </UserRoleContext.Provider>
   );
 }

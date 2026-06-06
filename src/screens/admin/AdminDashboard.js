@@ -14,25 +14,25 @@ const CARE_LABELS = {
 };
 
 const TABS = [
-  { key: 'PENDING_VALIDATION', label: 'À valider',  icon: '⏳' },
   { key: 'VALIDATED',          label: 'À publier',  icon: '📋' },
+  { key: 'PENDING_VALIDATION', label: 'En attente', icon: '⏳' },
   { key: 'ACTIVE',             label: 'Actives',    icon: '🟢' },
   { key: 'AGENTS',             label: 'Agents',     icon: '🏥' },
   { key: 'HOPITAUX',           label: 'Hôpitaux',   icon: '🏛️' },
 ];
 
 export default function AdminDashboard({ navigation }) {
-  const [user, setUser]           = useState(null);
-  const [tab, setTab]             = useState('PENDING_VALIDATION');
-  const [pending, setPending]     = useState([]);
-  const [validated, setValidated] = useState([]);
-  const [active, setActive]       = useState([]);
-  const [completed, setCompleted] = useState([]);
-  const [agents, setAgents]       = useState([]);
-  const [hospitals, setHospitals] = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const [user, setUser]             = useState(null);
+  const [tab, setTab]               = useState('VALIDATED');
+  const [validated, setValidated]   = useState([]);
+  const [pending, setPending]       = useState([]);
+  const [active, setActive]         = useState([]);
+  const [completed, setCompleted]   = useState([]);
+  const [agents, setAgents]         = useState([]);
+  const [hospitals, setHospitals]   = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [acting, setActing]       = useState(null);
+  const [acting, setActing]         = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -42,22 +42,22 @@ export default function AdminDashboard({ navigation }) {
         .then((me) => setUser((prev) => ({ ...prev, full_name: me.full_name })))
         .catch(() => {});
 
-      const [p, v, a, c, h] = await Promise.all([
-        medicalRequestsAPI.getAll({ status: 'PENDING_VALIDATION', limit: 50 }),
+      const [v, p, a, c, agRes, hRes] = await Promise.all([
         medicalRequestsAPI.getAll({ status: 'VALIDATED',          limit: 50 }),
+        medicalRequestsAPI.getAll({ status: 'PENDING_VALIDATION', limit: 50 }),
         medicalRequestsAPI.getAll({ status: 'ACTIVE',             limit: 50 }),
         medicalRequestsAPI.getAll({ status: 'COMPLETED',          limit: 50 }),
-        hospitalsAPI.getAll(),
+        api.get('/admin/users', { params: { role: 'HOSPITAL_AGENT', limit: 100 } })
+           .then(r => r.data).catch(() => []),
+        hospitalsAPI.getAll().catch(() => []),
       ]);
-      setPending(Array.isArray(p) ? p : []);
+
       setValidated(Array.isArray(v) ? v : []);
+      setPending(Array.isArray(p) ? p : []);
       setActive(Array.isArray(a) ? a : []);
       setCompleted(Array.isArray(c) ? c : []);
-      setHospitals(Array.isArray(h) ? h : []);
-
-      api.get('/admin/users', { params: { role: 'HOSPITAL_AGENT', limit: 50 } })
-        .then((res) => setAgents(Array.isArray(res.data) ? res.data : []))
-        .catch(() => {});
+      setAgents(Array.isArray(agRes) ? agRes : []);
+      setHospitals(Array.isArray(hRes) ? hRes : []);
     } catch (e) {
       console.error('AdminDashboard load error:', e);
     } finally {
@@ -139,19 +139,20 @@ export default function AdminDashboard({ navigation }) {
     ? `Bonjour, ${user.full_name.split(' ')[0]} 👋`
     : 'Bonjour 👋';
 
-  const listByTab = {
-    PENDING_VALIDATION: pending,
-    VALIDATED:          validated,
-    ACTIVE:             active,
-  };
-  const currentList = listByTab[tab] ?? [];
-
   const stats = [
     { label: 'À valider',  value: pending.length,   color: '#D97706', bg: '#FFFBEB' },
-    { label: 'À publier',  value: validated.length,  color: '#7C3AED', bg: '#F5F3FF' },
-    { label: 'Actives',    value: active.length,     color: '#1B6B45', bg: '#F0FDF4' },
-    { label: 'Complétées', value: completed.length,  color: '#2563EB', bg: '#EFF6FF' },
+    { label: 'À publier',  value: validated.length, color: '#7C3AED', bg: '#F5F3FF' },
+    { label: 'Actives',    value: active.length,    color: '#0284C7', bg: '#E0F2FE' },
+    { label: 'Complétées', value: completed.length, color: '#16A34A', bg: '#ECFDF5' },
   ];
+
+  const tabCount = {
+    VALIDATED:          validated.length,
+    PENDING_VALIDATION: pending.length,
+    ACTIVE:             active.length,
+    AGENTS:             agents.length,
+    HOPITAUX:           hospitals.length,
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -167,43 +168,37 @@ export default function AdminDashboard({ navigation }) {
       </View>
 
       {/* Stats */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.statsScroll}
-        contentContainerStyle={styles.statsRow}
-      >
+      <View style={styles.statsRow}>
         {stats.map((s) => (
           <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
             <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
             <Text style={styles.statLabel}>{s.label}</Text>
           </View>
         ))}
-      </ScrollView>
+      </View>
 
-      {/* Onglets */}
+      {/* Onglets scrollables */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.tabsScroll}
-        contentContainerStyle={styles.tabs}
+        style={styles.tabsRow}
+        contentContainerStyle={styles.tabsContent}
       >
-        {TABS.map((t) => {
-          const count = listByTab[t.key]?.length;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]}
-              onPress={() => setTab(t.key)}
-            >
-              <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>
-                {t.icon} {t.label}{count > 0 ? ` (${count})` : ''}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        {TABS.map((t) => (
+          <TouchableOpacity
+            key={t.key}
+            style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]}
+            onPress={() => setTab(t.key)}
+          >
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>
+              {t.icon} {t.label}
+              {tabCount[t.key] > 0 ? ` (${tabCount[t.key]})` : ''}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
 
+      {/* Contenu */}
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
@@ -215,34 +210,46 @@ export default function AdminDashboard({ navigation }) {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Onglets demandes médicales */}
-        {(tab === 'PENDING_VALIDATION' || tab === 'VALIDATED' || tab === 'ACTIVE') && (
-          currentList.length === 0
-            ? <EmptyState tab={tab} />
-            : currentList.map((req) => (
+        {tab === 'VALIDATED' && (
+          validated.length === 0
+            ? <EmptyState icon="🎉" text="Aucune demande validée en attente de publication." />
+            : validated.map((req) => (
                 <AdminCard
-                  key={req.id}
-                  req={req}
-                  tab={tab}
-                  acting={acting}
+                  key={req.id} req={req} tab={tab} acting={acting}
                   onPublish={() => handlePublish(req)}
                   onReject={() => handleReject(req)}
                 />
               ))
         )}
 
-        {/* Onglet Agents */}
+        {tab === 'PENDING_VALIDATION' && (
+          pending.length === 0
+            ? <EmptyState icon="📭" text="Aucune demande en attente de validation." />
+            : pending.map((req) => (
+                <AdminCard
+                  key={req.id} req={req} tab={tab} acting={acting}
+                  onPublish={() => handlePublish(req)}
+                  onReject={() => handleReject(req)}
+                />
+              ))
+        )}
+
+        {tab === 'ACTIVE' && (
+          active.length === 0
+            ? <EmptyState icon="🟢" text="Aucune demande active pour le moment." />
+            : active.map((req) => <ActiveCard key={req.id} req={req} />)
+        )}
+
         {tab === 'AGENTS' && (
           agents.length === 0
-            ? <EmptyState tab="AGENTS" />
+            ? <EmptyState icon="👨‍⚕️" text="Aucun agent enregistré." />
             : agents.map((agent) => <AgentCard key={agent.id} agent={agent} />)
         )}
 
-        {/* Onglet Hôpitaux */}
         {tab === 'HOPITAUX' && (
           hospitals.length === 0
-            ? <EmptyState tab="HOPITAUX" />
-            : hospitals.map((hosp) => <HospitalCard key={hosp.id} hosp={hosp} />)
+            ? <EmptyState icon="🏥" text="Aucun hôpital enregistré." />
+            : hospitals.map((h) => <HospitalCard key={h.id} hospital={h} />)
         )}
 
         <View style={{ height: 32 }} />
@@ -251,13 +258,103 @@ export default function AdminDashboard({ navigation }) {
   );
 }
 
-// ── Sous-composants ────────────────────────────────────────────
+// ── Sous-composants ───────────────────────────────────────────
+
+function EmptyState({ icon, text }) {
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyIcon}>{icon}</Text>
+      <Text style={styles.emptyText}>{text}</Text>
+    </View>
+  );
+}
+
+function ActiveCard({ req }) {
+  const careLabel = CARE_LABELS[req.care_type] || req.care_type || '—';
+  const goal      = req.amount_requested ?? req.amount_needed ?? 0;
+  const collected = req.amount_collected ?? req.amount_raised ?? 0;
+  const progress  = goal > 0 ? Math.min(collected / goal, 1) : 0;
+  const pct       = Math.round(progress * 100);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTop}>
+        <Text style={styles.cardDate}>
+          {new Date(req.created_at).toLocaleDateString('fr-FR', {
+            day: 'numeric', month: 'short', year: 'numeric',
+          })}
+        </Text>
+        {req.urgency_level && (
+          <Text style={[styles.urgencyText,
+            { color: req.urgency_level === 'CRITIQUE' ? '#EF4444' : '#D97706' }]}>
+            {req.urgency_level === 'CRITIQUE' ? '🔴 Critique' : '🟡 Relative'}
+          </Text>
+        )}
+      </View>
+      <Text style={styles.cardPseudonym}>{req.patient_pseudonym}</Text>
+      <Text style={styles.cardMetaSingle}>💊 {careLabel}</Text>
+
+      <View style={styles.progressRow}>
+        <View style={styles.progressBg}>
+          <View style={[styles.progressFill, { width: `${pct}%` }]} />
+        </View>
+        <Text style={styles.progressPct}>{pct}%</Text>
+      </View>
+      <View style={styles.progressAmounts}>
+        <Text style={styles.progressCollected}>
+          {Number(collected).toLocaleString('fr-FR')} FCFA collectés
+        </Text>
+        <Text style={styles.progressGoal}>
+          / {Number(goal).toLocaleString('fr-FR')} FCFA
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function AgentCard({ agent }) {
+  const hospitalName = agent.hospital_name ?? agent.hospital?.name ?? null;
+  return (
+    <View style={styles.card}>
+      <View style={styles.agentRow}>
+        <View style={styles.agentAvatar}>
+          <Text style={{ fontSize: 18 }}>👤</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.agentName}>{agent.full_name || '—'}</Text>
+          <Text style={styles.agentEmail}>{agent.email}</Text>
+          {hospitalName ? (
+            <Text style={styles.agentHospital}>🏥 {hospitalName}</Text>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function HospitalCard({ hospital }) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.hospitalRow}>
+        <Text style={styles.hospitalName} numberOfLines={2}>{hospital.name}</Text>
+        <View style={[styles.verifiedBadge,
+          { backgroundColor: hospital.is_verified ? '#ECFDF5' : '#F1F5F9' }]}>
+          <Text style={[styles.verifiedText,
+            { color: hospital.is_verified ? '#16A34A' : '#94A3B8' }]}>
+            {hospital.is_verified ? '✅ Vérifié' : '⏳ En attente'}
+          </Text>
+        </View>
+      </View>
+      {hospital.city ? (
+        <Text style={styles.hospitalCity}>📍 {hospital.city}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 function AdminCard({ req, tab, acting, onPublish, onReject }) {
-  const careLabel    = CARE_LABELS[req.care_type] || req.care_type || req.medical_need || '—';
+  const careLabel    = CARE_LABELS[req.care_type] || req.care_type || '—';
   const amount       = req.amount_requested ?? req.amount_needed ?? 0;
-  const collected    = req.amount_collected ?? req.amount_raised ?? 0;
-  const progress     = amount > 0 ? Math.min(collected / amount, 1) : 0;
   const isPublishing = acting === req.id + '_publish';
   const isRejecting  = acting === req.id + '_reject';
 
@@ -270,10 +367,8 @@ function AdminCard({ req, tab, acting, onPublish, onReject }) {
           })}
         </Text>
         {req.urgency_level && (
-          <Text style={{
-            fontSize: 12, fontWeight: '700',
-            color: req.urgency_level === 'CRITIQUE' ? '#EF4444' : '#D97706',
-          }}>
+          <Text style={[styles.urgencyText,
+            { color: req.urgency_level === 'CRITIQUE' ? '#EF4444' : '#D97706' }]}>
             {req.urgency_level === 'CRITIQUE' ? '🔴 Critique' : '🟡 Relative'}
           </Text>
         )}
@@ -281,33 +376,16 @@ function AdminCard({ req, tab, acting, onPublish, onReject }) {
 
       <Text style={styles.cardPseudonym}>{req.patient_pseudonym}</Text>
 
-      <View style={styles.cardMeta}>
+      <View style={styles.cardMetaRow}>
         <Text style={styles.cardMetaText}>💊 {careLabel}</Text>
         <Text style={styles.cardAmount}>{Number(amount).toLocaleString('fr-FR')} FCFA</Text>
       </View>
 
-      {/* Barre de progression (onglet Actives) */}
-      {tab === 'ACTIVE' && (
-        <View style={styles.progressContainer}>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
-          </View>
-          <Text style={styles.progressLabel}>
-            {Number(collected).toLocaleString('fr-FR')} / {Number(amount).toLocaleString('fr-FR')} FCFA
-            {'  '}({Math.round(progress * 100)}%)
-          </Text>
-        </View>
-      )}
+      <View style={styles.validatorsRow}>
+        <Text style={styles.validatorItem}>{req.css_validator_id ? '✅' : '⏳'} CSS</Text>
+        <Text style={styles.validatorItem}>{req.rm_validator_id  ? '✅' : '⏳'} RM</Text>
+      </View>
 
-      {/* Validateurs (onglets VALIDATED / PENDING) */}
-      {tab !== 'ACTIVE' && (
-        <View style={styles.validatorsRow}>
-          <Text style={styles.validatorItem}>{req.css_validator_id ? '✅' : '⏳'} CSS</Text>
-          <Text style={styles.validatorItem}>{req.rm_validator_id  ? '✅' : '⏳'} RM</Text>
-        </View>
-      )}
-
-      {/* Actions */}
       <View style={styles.actionsRow}>
         {tab === 'VALIDATED' && (
           <TouchableOpacity
@@ -322,73 +400,23 @@ function AdminCard({ req, tab, acting, onPublish, onReject }) {
             }
           </TouchableOpacity>
         )}
-        {(tab === 'VALIDATED' || tab === 'PENDING_VALIDATION') && (
-          <TouchableOpacity
-            style={[styles.rejectBtn, isRejecting && { opacity: 0.6 }]}
-            onPress={onReject}
-            disabled={isPublishing || isRejecting}
-            activeOpacity={0.8}
-          >
-            {isRejecting
-              ? <ActivityIndicator color="#EF4444" size="small" />
-              : <Text style={styles.rejectBtnText}>Rejeter</Text>
-            }
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[styles.rejectBtn, isRejecting && { opacity: 0.6 }]}
+          onPress={onReject}
+          disabled={isPublishing || isRejecting}
+          activeOpacity={0.8}
+        >
+          {isRejecting
+            ? <ActivityIndicator color="#EF4444" size="small" />
+            : <Text style={styles.rejectBtnText}>Rejeter</Text>
+          }
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function AgentCard({ agent }) {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardPseudonym}>{agent.full_name || '—'}</Text>
-      <Text style={styles.cardMetaText}>📧 {agent.email}</Text>
-      {agent.hospital_name && (
-        <Text style={[styles.cardMetaText, { marginTop: 4 }]}>🏥 {agent.hospital_name}</Text>
-      )}
-    </View>
-  );
-}
-
-function HospitalCard({ hosp }) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <Text style={styles.cardPseudonym}>{hosp.name || hosp.nom || '—'}</Text>
-        <Text style={{
-          fontSize: 12, fontWeight: '700',
-          color: hosp.is_verified ? '#1B6B45' : '#D97706',
-        }}>
-          {hosp.is_verified ? '✅ Vérifié' : '⏳ Non vérifié'}
-        </Text>
-      </View>
-      {(hosp.city || hosp.ville) && (
-        <Text style={styles.cardMetaText}>📍 {hosp.city || hosp.ville}</Text>
-      )}
-    </View>
-  );
-}
-
-function EmptyState({ tab }) {
-  const config = {
-    PENDING_VALIDATION: { icon: '📭', text: 'Aucune demande en attente de validation.' },
-    VALIDATED:          { icon: '🎉', text: 'Aucune demande validée en attente de publication.' },
-    ACTIVE:             { icon: '📊', text: 'Aucune demande active en cours.' },
-    AGENTS:             { icon: '👤', text: 'Aucun agent hospitalier enregistré.' },
-    HOPITAUX:           { icon: '🏥', text: 'Aucun hôpital enregistré.' },
-  };
-  const { icon, text } = config[tab] || { icon: '📭', text: 'Aucune donnée.' };
-  return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyIcon}>{icon}</Text>
-      <Text style={styles.emptyText}>{text}</Text>
-    </View>
-  );
-}
-
-// ── Styles ─────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFF' },
@@ -405,21 +433,24 @@ const styles = StyleSheet.create({
   logoutBtn:  { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#FEF2F2', borderRadius: 10 },
   logoutText: { color: '#EF4444', fontWeight: '700', fontSize: 13 },
 
-  statsScroll: { flexGrow: 0, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E8F0FE' },
-  statsRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  statCard:    { borderRadius: 12, padding: 12, alignItems: 'center', minWidth: 80 },
-  statValue:   { fontSize: 20, fontWeight: '900' },
-  statLabel:   { fontSize: 10, color: '#64748B', marginTop: 2 },
+  statsRow: {
+    flexDirection: 'row', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E8F0FE',
+  },
+  statCard:  { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
+  statValue: { fontSize: 18, fontWeight: '900' },
+  statLabel: { fontSize: 9, color: '#64748B', marginTop: 2, textAlign: 'center' },
 
-  tabsScroll: { flexGrow: 0, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E8F0FE' },
-  tabs:       { flexDirection: 'row', paddingHorizontal: 4 },
+  tabsRow:     { maxHeight: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E8F0FE' },
+  tabsContent: { paddingHorizontal: 6, alignItems: 'center' },
   tabBtn: {
-    paddingVertical: 12, paddingHorizontal: 14,
-    borderBottomWidth: 2, borderBottomColor: 'transparent',
+    paddingHorizontal: 12, paddingVertical: 13,
+    borderBottomWidth: 2, borderBottomColor: 'transparent', marginHorizontal: 2,
   },
   tabBtnActive:  { borderBottomColor: '#1B6B45' },
   tabText:       { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
-  tabTextActive: { color: '#1B6B45' },
+  tabTextActive: { color: '#1B6B45', fontWeight: '700' },
 
   scroll: { paddingHorizontal: 16, paddingTop: 16 },
 
@@ -430,23 +461,21 @@ const styles = StyleSheet.create({
   },
   cardTop:       { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   cardDate:      { fontSize: 11, color: '#94A3B8' },
+  urgencyText:   { fontSize: 12, fontWeight: '700' },
   cardPseudonym: { fontSize: 15, fontWeight: '800', color: '#1E293B', marginBottom: 8 },
-  cardMeta:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  cardMetaRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   cardMetaText:  { fontSize: 12, color: '#64748B' },
+  cardMetaSingle:{ fontSize: 12, color: '#64748B', marginBottom: 12 },
   cardAmount:    { fontSize: 13, fontWeight: '700', color: '#1B6B45' },
-
-  progressContainer: { marginBottom: 12 },
-  progressTrack: {
-    height: 6, borderRadius: 3, backgroundColor: '#E2E8F0', overflow: 'hidden', marginBottom: 4,
-  },
-  progressFill:  { height: '100%', backgroundColor: '#1B6B45', borderRadius: 3 },
-  progressLabel: { fontSize: 11, color: '#64748B' },
 
   validatorsRow: { flexDirection: 'row', gap: 16, marginBottom: 12 },
   validatorItem: { fontSize: 13, fontWeight: '600', color: '#64748B' },
 
-  actionsRow:     { flexDirection: 'row', gap: 8 },
-  publishBtn:     { flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: '#1B6B45', alignItems: 'center' },
+  actionsRow: { flexDirection: 'row', gap: 8 },
+  publishBtn: {
+    flex: 1, paddingVertical: 11, borderRadius: 10,
+    backgroundColor: '#1B6B45', alignItems: 'center',
+  },
   publishBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   rejectBtn: {
     flex: 1, paddingVertical: 11, borderRadius: 10,
@@ -454,6 +483,30 @@ const styles = StyleSheet.create({
   },
   rejectBtnText: { color: '#EF4444', fontWeight: '700', fontSize: 14 },
 
+  // Actives — barre de progression
+  progressRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  progressBg:        { flex: 1, height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' },
+  progressFill:      { height: 8, backgroundColor: '#1B6B45', borderRadius: 4 },
+  progressPct:       { fontSize: 12, fontWeight: '700', color: '#1B6B45', minWidth: 32, textAlign: 'right' },
+  progressAmounts:   { flexDirection: 'row', justifyContent: 'space-between' },
+  progressCollected: { fontSize: 12, fontWeight: '700', color: '#1B6B45' },
+  progressGoal:      { fontSize: 12, color: '#94A3B8' },
+
+  // Agents
+  agentRow:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  agentAvatar:  { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center' },
+  agentName:    { fontSize: 14, fontWeight: '800', color: '#1E293B' },
+  agentEmail:   { fontSize: 12, color: '#64748B', marginTop: 2 },
+  agentHospital:{ fontSize: 12, color: '#0284C7', marginTop: 2 },
+
+  // Hôpitaux
+  hospitalRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 8 },
+  hospitalName:  { fontSize: 14, fontWeight: '800', color: '#1E293B', flex: 1 },
+  verifiedBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  verifiedText:  { fontSize: 12, fontWeight: '700' },
+  hospitalCity:  { fontSize: 12, color: '#64748B' },
+
+  // Empty state
   empty:     { alignItems: 'center', paddingVertical: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 22 },
